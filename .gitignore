@@ -1,0 +1,29 @@
+# Секреты и локальные настройки
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Локальные данные базы и выгрузки
+data/
+*.dump
+*.sql.gz
+
+# IDE и ОС
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
