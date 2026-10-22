@@ -20,8 +20,9 @@ Text-to-SQL по базе интернет-магазина книг (PostgreSQL
 - Запуск — Docker Compose (сервис + PostgreSQL)
 - Архитектура — чистая, слои `domain` → `application` → `infrastructure` / `presentation`, как в предыдущем проекте
 
-Ещё не решено (обсуждается в brainstorm): провайдер LLM, способ доступа к БД из приложения
-(SQLAlchemy async или asyncpg напрямую), интерфейс для пользователя (веб-страница или Telegram-бот поверх API).
+Решения, которые трудно отменить, — в `docs/adr/`: провайдер LLM — Anthropic, Claude Haiku 5.5 (0002);
+доступ к БД — asyncpg напрямую (0003); таблицы магазина в схеме `shop`, журнал в `app` (0004);
+интерфейс — веб-страница на FastAPI + Jinja2 (0005). Словарь терминов — `CONTEXT.md`.
 
 ## Проверка SQL
 
