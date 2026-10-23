@@ -1,0 +1,56 @@
+x-db-env: &db-env
+  DB_HOST: db
+  DB_PORT: 5432
+  DB_NAME: ${DB_NAME:-bookstore}
+  DB_ADMIN_USER: ${DB_ADMIN_USER:-postgres}
+  DB_ADMIN_PASSWORD: ${DB_ADMIN_PASSWORD:-postgres}
+  DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:-migrator}
+  DB_APP_SERVICE_PASSWORD: ${DB_APP_SERVICE_PASSWORD:-app_service}
+  DB_LLM_READONLY_PASSWORD: ${DB_LLM_READONLY_PASSWORD:-llm_readonly}
+
+services:
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Одноразовый: роли (bootstrap под суперпользователем), затем миграции под migrator
+  migrate:
+    build: .
+    environment: *db-env
+    command: ["sh", "-c", "python -m sql_helper.infrastructure.db.bootstrap && alembic upgrade head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${DB_NAME:-bookstore}
+      POSTGRES_USER: ${DB_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-postgres}
+    ports:
+      # Порт на хосте — из DB_PORT: если 5432 занят локальным PostgreSQL, задайте другой в .env
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
