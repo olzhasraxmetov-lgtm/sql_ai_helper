@@ -4,10 +4,12 @@ version = "0.1.0"
 description = "Text-to-SQL по базе интернет-магазина книг"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.20.1",
     "asyncpg>=0.32.0",
     "fastapi>=0.159.1",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.1",
+    "sqlalchemy[asyncio]>=2.1.6",
     "uvicorn>=0.54.0",
 ]
 
@@ -25,7 +27,7 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "ASYNC"]
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["src", "tests"]
+files = ["src", "tests", "migrations"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
