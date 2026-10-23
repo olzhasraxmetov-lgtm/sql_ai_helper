@@ -35,33 +35,43 @@ async def _recreate_database(settings: DatabaseSettings) -> None:
     maintenance = settings.model_copy(update={"name": "postgres"})
     conn = await asyncpg.connect(maintenance.dsn(settings.admin_user))
     try:
-        await conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB_NAME} WITH (FORCE)")
-        await conn.execute(f"CREATE DATABASE {TEST_DB_NAME}")
+        await conn.execute(f"DROP DATABASE IF EXISTS {settings.name} WITH (FORCE)")
+        await conn.execute(f"CREATE DATABASE {settings.name}")
     finally:
         await conn.close()
 
 
 @pytest.fixture(scope="session")
-def db_settings() -> DatabaseSettings:
-    """Пустая база bookstore_test: bootstrap ролей и все миграции."""
+def create_database() -> Callable[[str], DatabaseSettings]:
+    """Фабрика пустых баз: пересоздаёт базу с этим именем, bootstrap ролей и все миграции."""
     try:
         base = DatabaseSettings()
     except ValidationError as error:
         _unavailable(f"не заданы переменные DB_*: {error}")
-    settings = base.model_copy(update={"name": TEST_DB_NAME})
-    try:
-        asyncio.run(_recreate_database(settings))
-    except (OSError, asyncpg.PostgresError) as error:
-        _unavailable(str(error))
 
-    asyncio.run(bootstrap(settings))
-    alembic_config = Config(ROOT / "alembic.ini")
-    alembic_config.set_main_option(
-        "sqlalchemy.url", settings.dsn(MIGRATOR_ROLE, driver="postgresql+asyncpg")
-    )
-    alembic_config.attributes["configure_logger"] = False
-    command.upgrade(alembic_config, "head")
-    return settings
+    def _create(name: str) -> DatabaseSettings:
+        settings = base.model_copy(update={"name": name})
+        try:
+            asyncio.run(_recreate_database(settings))
+        except (OSError, asyncpg.PostgresError) as error:
+            _unavailable(str(error))
+
+        asyncio.run(bootstrap(settings))
+        alembic_config = Config(ROOT / "alembic.ini")
+        alembic_config.set_main_option(
+            "sqlalchemy.url", settings.dsn(MIGRATOR_ROLE, driver="postgresql+asyncpg")
+        )
+        alembic_config.attributes["configure_logger"] = False
+        command.upgrade(alembic_config, "head")
+        return settings
+
+    return _create
+
+
+@pytest.fixture(scope="session")
+def db_settings(create_database: Callable[[str], DatabaseSettings]) -> DatabaseSettings:
+    """Пустая база bookstore_test."""
+    return create_database(TEST_DB_NAME)
 
 
 @pytest.fixture
