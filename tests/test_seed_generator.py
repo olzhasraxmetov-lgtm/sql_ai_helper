@@ -1,24 +1,73 @@
-"""Генератор фоновых данных без базы: детерминизм и правила уровня приложения."""
+"""Генератор без базы: детерминизм и правила уровня приложения — для фона и для фона
+с подсаженными случаями (подсаженные строки обязаны соблюдать те же правила)."""
 
 from collections import defaultdict
+from collections.abc import Callable
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
 
-from sql_helper.infrastructure.seed.generator import PERIOD_END, PERIOD_START, Dataset, generate
+from sql_helper.infrastructure.seed.generator import (
+    PERIOD_END,
+    PERIOD_START,
+    TZ,
+    Dataset,
+    generate,
+)
+from sql_helper.infrastructure.seed.planted import add_planted
+
+type Build = Callable[[int], Dataset]
+
+
+@pytest.fixture(
+    scope="module",
+    params=[generate, lambda seed: add_planted(generate(seed))],
+    ids=["background", "with_planted"],
+)
+def build(request: pytest.FixtureRequest) -> Build:
+    builder: Build = request.param
+    return builder
 
 
 @pytest.fixture(scope="module")
-def data() -> Dataset:
-    return generate(seed=42)
+def data(build: Build) -> Dataset:
+    return build(42)
 
 
-def test_same_seed_gives_same_data(data: Dataset) -> None:
-    assert generate(seed=42) == data
+def test_same_seed_gives_same_data(build: Build, data: Dataset) -> None:
+    assert build(42) == data
 
 
-def test_other_seed_gives_other_data(data: Dataset) -> None:
-    assert generate(seed=7).orders != data.orders
+def test_other_seed_gives_other_data(build: Build, data: Dataset) -> None:
+    assert build(7).orders != data.orders
+
+
+def test_ids_are_unique(data: Dataset) -> None:
+    for rows in (
+        data.users,
+        data.authors,
+        data.books,
+        data.orders,
+        data.order_item,
+        data.payments,
+        data.refunds,
+    ):
+        ids = [row.id for row in rows]
+        assert len(ids) == len(set(ids))
+
+
+def test_one_succeeded_payment_per_order(data: Dataset) -> None:
+    succeeded = [p.order_id for p in data.payments if p.status == "succeeded"]
+
+    assert len(succeeded) == len(set(succeeded))
+
+
+def test_first_month_has_no_refunds(data: Dataset) -> None:
+    # Ловушка 5 (planted.py): месяц с продажами без возвратов — SUM по пустому набору = NULL
+    december = datetime(2024, 12, 1, tzinfo=TZ)
+
+    assert [r.id for r in data.refunds if r.refunded_at < december] == []
 
 
 def test_discount_not_greater_than_order_sum(data: Dataset) -> None:

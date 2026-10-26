@@ -43,6 +43,9 @@ async def bootstrap(settings: DatabaseSettings) -> None:
         # закрываем, чтобы llm_readonly видел из пользовательских объектов только shop
         await conn.execute(f"REVOKE TEMPORARY ON DATABASE {db} FROM PUBLIC")
         await conn.execute("REVOKE ALL ON SCHEMA public FROM PUBLIC")
+        # Магазин работает по Asia/Almaty: литерал '2026-04-01' в SQL — полночь по Алматы,
+        # а не по UTC (пояс образа postgres по умолчанию), иначе граница месяца съезжает на 5 часов
+        await conn.execute(f"ALTER DATABASE {db} SET timezone = 'Asia/Almaty'")
         # Имена таблиц в SQL от LLM пишутся без схемы
         await conn.execute(f"ALTER ROLE {LLM_READONLY_ROLE} SET search_path = shop")
     finally:
