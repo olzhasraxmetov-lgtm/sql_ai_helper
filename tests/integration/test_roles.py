@@ -17,6 +17,17 @@ async def test_llm_readonly_reads_shop_without_schema_prefix(connect: Connect) -
     assert count == 0
 
 
+async def test_session_time_zone_is_almaty(connect: Connect) -> None:
+    conn = await connect(LLM_READONLY_ROLE)
+
+    # Литерал без пояса — полночь по Алматы (docs/sql-rules.md, «Даты и часовой пояс»)
+    is_almaty_midnight = await conn.fetchval(
+        "SELECT '2026-04-01'::timestamptz = '2026-04-01 00:00+05'::timestamptz"
+    )
+
+    assert is_almaty_midnight
+
+
 async def test_llm_readonly_cannot_read_app(connect: Connect) -> None:
     migrator = await connect(MIGRATOR_ROLE)
     await migrator.execute("CREATE TABLE IF NOT EXISTS app.probe (id int)")

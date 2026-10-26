@@ -209,6 +209,9 @@ CONFIRMED_UNPAID_SHARE = 0.02
 
 REFUND_ITEM_SHARE = 0.035
 SECOND_REFUND_SHARE = 0.2  # вторая частичная доля возврата той же позиции
+# Первый месяц магазин возвратов не принимал: месяц с продажами без возвратов нужен
+# для ловушки «SUM по пустому набору = NULL» (planted.py, случай 5)
+REFUNDS_FROM = datetime(2024, 12, 1, tzinfo=TZ)
 REFUND_REASONS = [
     ("Брак печати", 25),
     ("Повреждена при доставке", 20),
@@ -554,7 +557,7 @@ def _refunds(
             continue
         # Правило приложения: вернуть можно не больше, чем куплено
         remaining = item.quantity
-        moment = paid_at
+        moment = max(paid_at, REFUNDS_FROM)
         while remaining > 0:
             quantity = rng.randint(1, remaining)
             moment += timedelta(days=rng.randrange(1, 30), seconds=rng.randrange(86_400))
